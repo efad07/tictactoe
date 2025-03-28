@@ -1,0 +1,229 @@
+document.addEventListener('DOMContentLoaded', function() {
+    // Set copyright year
+    document.getElementById('year').textContent = new Date().getFullYear();
+    
+    // Game state variables
+    let board = ['', '', '', '', '', '', '', '', ''];
+    let currentPlayer = 'X';
+    let gameActive = true;
+    let gameMode = 'ai'; // 'ai' or 'twoPlayer'
+    let scores = { X: 0, O: 0 };
+    
+    // DOM elements
+    const boardElement = document.getElementById('board');
+    const winnerMessageElement = document.getElementById('winnerMessage');
+    const playerXScoreElement = document.getElementById('playerXScore');
+    const playerOScoreElement = document.getElementById('playerOScore');
+    const currentPlayerElement = document.querySelector('.current-player');
+    const resetBtn = document.getElementById('resetBtn');
+    const newGameBtn = document.getElementById('newGameBtn');
+    const aiModeBtn = document.getElementById('aiModeBtn');
+    const twoPlayerBtn = document.getElementById('twoPlayerBtn');
+    const scoreXElement = document.querySelector('.score.x');
+    const scoreOElement = document.querySelector('.score.o');
+    
+    // Initialize the game board
+    function initializeBoard() {
+        boardElement.innerHTML = '';
+        for (let i = 0; i < 9; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.setAttribute('data-index', i);
+            cell.addEventListener('click', handleCellClick);
+            boardElement.appendChild(cell);
+        }
+    }
+    
+    // Handle cell click
+    function handleCellClick(e) {
+        const clickedCell = e.target;
+        const clickedCellIndex = parseInt(clickedCell.getAttribute('data-index'));
+        
+        // If cell already filled or game not active, ignore click
+        if (board[clickedCellIndex] !== '' || !gameActive) return;
+        
+        // Process player move
+        processMove(clickedCell, clickedCellIndex);
+        
+        // If in AI mode and game is still active, make AI move
+        if (gameMode === 'ai' && gameActive && currentPlayer === 'O') {
+            setTimeout(makeAIMove, 600);
+        }
+    }
+    
+    // Process a move
+    function processMove(cell, index) {
+        // Update board state
+        board[index] = currentPlayer;
+        
+        // Add animation class
+        cell.classList.add('animate__animated', 'animate__zoomIn');
+        setTimeout(() => {
+            cell.classList.remove('animate__animated', 'animate__zoomIn');
+        }, 300);
+        
+        cell.textContent = currentPlayer;
+        cell.classList.add(currentPlayer.toLowerCase());
+        
+        // Check for win or draw
+        const winningCombination = checkWin();
+        if (winningCombination) {
+            handleWin(winningCombination);
+        } else if (!board.includes('')) {
+            handleDraw();
+        } else {
+            // Switch player
+            switchPlayer();
+        }
+    }
+    
+    // Switch to next player
+    function switchPlayer() {
+        currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+        updateCurrentPlayerDisplay();
+    }
+    
+    // Update current player display
+    function updateCurrentPlayerDisplay() {
+        currentPlayerElement.className = `current-player ${currentPlayer.toLowerCase()}`;
+        currentPlayerElement.querySelector('.player-icon').textContent = currentPlayer;
+        
+        // Update active score indicator
+        if (currentPlayer === 'X') {
+            scoreXElement.classList.add('active');
+            scoreOElement.classList.remove('active');
+        } else {
+            scoreXElement.classList.remove('active');
+            scoreOElement.classList.add('active');
+        }
+    }
+    
+    // Check for win
+    function checkWin() {
+        const winPatterns = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
+            [0, 4, 8], [2, 4, 6]             // diagonals
+        ];
+        
+        for (const pattern of winPatterns) {
+            const [a, b, c] = pattern;
+            if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+                return pattern;
+            }
+        }
+        return null;
+    }
+    
+    // Handle win
+    function handleWin(winningCombination) {
+        gameActive = false;
+        scores[currentPlayer]++;
+        updateScoreboard();
+        
+        // Highlight winning cells
+        winningCombination.forEach(index => {
+            const cell = boardElement.children[index];
+            cell.classList.add('winner');
+        });
+        
+        winnerMessageElement.textContent = `Player ${currentPlayer} wins!`;
+    }
+    
+    // Handle draw
+    function handleDraw() {
+        gameActive = false;
+        winnerMessageElement.textContent = "Game ended in a draw!";
+    }
+    
+    // Update scoreboard
+    function updateScoreboard() {
+        playerXScoreElement.textContent = scores.X;
+        playerOScoreElement.textContent = scores.O;
+    }
+    
+    // Reset current game (keep scores)
+    function resetGame() {
+        board = ['', '', '', '', '', '', '', '', ''];
+        currentPlayer = 'X';
+        gameActive = true;
+        winnerMessageElement.textContent = '';
+        updateCurrentPlayerDisplay();
+        
+        // Clear board UI
+        Array.from(boardElement.children).forEach(cell => {
+            cell.textContent = '';
+            cell.className = 'cell';
+        });
+    }
+    
+    // Start a new game (reset scores)
+    function newGame() {
+        resetGame();
+        scores = { X: 0, O: 0 };
+        updateScoreboard();
+    }
+    
+    // Set game mode
+    function setGameMode(mode) {
+        gameMode = mode;
+        if (mode === 'ai') {
+            aiModeBtn.disabled = true;
+            twoPlayerBtn.disabled = false;
+            currentPlayer = 'X'; // Human always starts as X in AI mode
+        } else {
+            aiModeBtn.disabled = false;
+            twoPlayerBtn.disabled = true;
+            currentPlayer = 'X';
+        }
+        updateCurrentPlayerDisplay();
+        resetGame();
+    }
+    
+    // AI move logic
+    function makeAIMove() {
+        if (!gameActive) return;
+        
+        // Simple AI: first try to win, then block, then random
+        let move = findWinningMove('O') || findWinningMove('X') || findRandomMove();
+        
+        if (move !== null) {
+            const cell = boardElement.children[move];
+            processMove(cell, move);
+        }
+    }
+    
+    // Find a winning move for the given player
+    function findWinningMove(player) {
+        const winPatterns = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
+            [0, 4, 8], [2, 4, 6]             // diagonals
+        ];
+        
+        for (const pattern of winPatterns) {
+            const [a, b, c] = pattern;
+            // Check if two in a row and third is empty
+            if (board[a] === player && board[b] === player && board[c] === '') return c;
+            if (board[a] === player && board[c] === player && board[b] === '') return b;
+            if (board[b] === player && board[c] === player && board[a] === '') return a;
+        }
+        return null;
+    }
+    
+    // Find a random empty cell
+    function findRandomMove() {
+        const emptyCells = board.map((cell, index) => cell === '' ? index : null).filter(val => val !== null);
+        return emptyCells.length > 0 ? emptyCells[Math.floor(Math.random() * emptyCells.length)] : null;
+    }
+    
+    // Event listeners
+    resetBtn.addEventListener('click', resetGame);
+    newGameBtn.addEventListener('click', newGame);
+    aiModeBtn.addEventListener('click', () => setGameMode('ai'));
+    twoPlayerBtn.addEventListener('click', () => setGameMode('twoPlayer'));
+    
+    // Initialize the game
+    initializeBoard();
+    setGameMode('ai');
+});
